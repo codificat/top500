@@ -1,8 +1,8 @@
-# Top 500 list web scraping
+# TOP500 list web scraping
 
 This is a project to do web scraping of the
-[Top 500 list](https://www.top500.org/), which is a list of the fastest
-supercomputers in the world.
+[TOP500 list](https://www.top500.org/), which is a list of the 500 most powerful
+commercially available computers in the world.
 
 The goal of this project is to extract the details of the computers from the
 lists presented in the web site as HTML tables and store them in CSV format for
@@ -22,7 +22,7 @@ about each supercomputer:
 - **System**: name of the system
 - **Cores**: number of compute cores
 - **Rmax**: maximal LINPACK performance achieved (TFlop/s)
-- **Rpeak**: theoretical peak performance
+- **Rpeak**: theoretical peak performance (TFlop/s)
 - **Power**: power consumption (kW)
 
 Details of the collected information are available on their
