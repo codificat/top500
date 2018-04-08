@@ -138,6 +138,8 @@ class Scraper:
                 # TODO: improve validation for the list structure
                 continue
             system = dict(rank=int(cols[0].get_text()))
+            system['year'] = year
+            system['month'] = month
             _parse_site_column(system, cols[1])
             _parse_system_column(system, cols[2])
             system['cores'] = locale.atoi(cols[3].get_text())
