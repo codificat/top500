@@ -8,7 +8,7 @@ See https://www.top500.org/
 
 import csv
 import requests
-from bs4 import BeautifulSoup
+from top500.scraper import Scraper
 
 def scrape_url(url, csvfile):
     '''This function downloads one single page from one of the lists,
@@ -22,18 +22,11 @@ def scrape_url(url, csvfile):
                            quoting=csv.QUOTE_MINIMAL)
 
     page = requests.get(url)
-    soup = BeautifulSoup(page.text, 'html.parser')
-
-    rows = soup.find_all('tr')
-    for row in rows:
-        cols = row.find_all('td')
-        if not cols:
-            # The header row uses TH instead of TD
-            cols = row.find_all('th')
-
-        entry = map(lambda x: x.get_text(', ', strip=True), cols)
-        csvwriter.writerow(entry)
-
+    scraper = Scraper()
+    scraper.scrape_list_page(page)
+    systems = scraper.get_systems()
+    for system in systems:
+        csvwriter.writerow(system.values())
     outfile.close()
 
 if __name__ == '__main__':
