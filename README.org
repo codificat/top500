@@ -1,0 +1,79 @@
+* TOP500 list web scraping
+
+This is a project to do web scraping of the [[https://www.top500.org/][TOP500 list]], which is a list of the
+500 most powerful commercially available computers in the world.
+
+The goal of this project is to extract the details of the computers from the
+lists presented in the web site as HTML tables and store them in CSV format for
+later processing.
+
+** The www.top500.org web site structure
+
+The lists are created twice a year (in June and November each year), and the web
+site presents each edition of the list split across 5 pages, with 100 entries
+each.
+
+Each page has one table with one row per entry. Each row provides these details
+about each supercomputer:
+
+  - **Rank**: the order of the supercomputer in that edition of the list
+  - **Site**: where is the supercomputer located
+  - **System**: name of the system
+  - **Cores**: number of compute cores
+  - **Rmax**: maximal LINPACK performance achieved (TFlop/s)
+  - **Rpeak**: theoretical peak performance (TFlop/s)
+  - **Power**: power consumption (kW)
+
+Details of the collected information are available on their [[https://www.top500.org/project/top500_description/][description page]].
+* Dependencies
+
+ - [[http://docs.python-requests.org/][Python Requests]]. The ~requests~ Python module is used to download the pages.
+ - [[https://www.crummy.com/software/BeautifulSoup/bs4/doc/][Beatuful Soup Documentation]]. Python ~BeautifulSoup~ is used to parse the pages.
+
+* Notes
+Some notes about the website structure, to keep in mind during scraping.
+** List page
+*** Number format
+Numbers are written in US format, with commas to separate thousands and dots for
+the decimal point.
+
+Conversion is performed using the ~locale~ module, setting locale to
+~en_US.UTF-8~ and using the ~atoi~ and ~atof~ functions.
+*** Highlights list vs full list
+Each edition of the list has a *highlights* list with the top 10 for that
+edition. That list has 6 columns, where the 2nd column contains both the system
+and the site mixed in.
+
+The tables with the full list contain 7 columns: the 2nd column contains the
+site and the 3rd contains the system.
+
+We scrape only the full lists, as the highlights/summary do not provide any
+additional information.
+*** List structure: sites and systems
+
+A site (col 2 in the list) looks like this:
+
+#+BEGIN_EXAMPLE
+  <td><a href="https://www.top500.org/site/SITE_ID">SITE_NAME</a><br>COUNTRY</td>
+#+END_EXAMPLE
+
+A system (col 3 in the list) looks like this:
+
+#+BEGIN_EXAMPLE
+  <td><a href="https://www.top500.org/system/SYSTEM_ID">
+      SYSTEM_NAME
+  </a><br/>MANUFACTURER</td>
+#+END_EXAMPLE
+
+** System details page
+*** Power
+Several Power values are marked as "(Submitted)", e.g. https://www.top500.org/system/177981.
+
+Some have "(Derived)": https://www.top500.org/system/178751
+
+Many have no value in this field.
+*** Some systems evolve over time
+Examples:
+ - https://www.top500.org/system/177459
+ - https://www.top500.org/system/177449
+
