@@ -25,6 +25,9 @@ def scrape_url(url, csvfile):
     scraper = Scraper()
     scraper.scrape_list_page(page)
     systems = scraper.get_systems()
+    # Write column names
+    csvwriter.writerow(systems[0].keys())
+    # Write data
     for system in systems:
         csvwriter.writerow(system.values())
     outfile.close()
