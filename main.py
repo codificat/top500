@@ -48,5 +48,6 @@ def scrape_url(url, csvfile):
     outfile.close()
 
 if __name__ == '__main__':
-    # Scrape the top 100 of the June 2017 list
-    scrape_url('https://www.top500.org/list/2017/06/', 'top100.csv')
+    (year, month) = parse_options()
+
+    scrape_url(url_for(year, month), 'top100.csv')
