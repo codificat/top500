@@ -6,9 +6,24 @@ computing systems in the world from the Top500 list.
 See https://www.top500.org/
 '''
 
+import argparse
 import csv
 import requests
 from top500.scraper import Scraper
+from top500.urlgen import *
+
+def parse_options():
+    '''Parses and validate arguments
+    '''
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-y', dest='year', help="[Start] Year", required=True,
+                        type=int, choices=VALID_YEARS)
+    parser.add_argument('-m', dest='month', help="[Start] Month", required=True,
+                        type=int, choices=VALID_MONTHS)
+
+    args = parser.parse_args()
+    return (args.year, args.month)
 
 def scrape_url(url, csvfile):
     '''This function downloads one single page from one of the lists,
