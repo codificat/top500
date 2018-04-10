@@ -47,6 +47,9 @@ def parse_options(dest):
 
     if dest.count < 100 or dest.count > 500 or dest.count % 100 != 0:
         parser.error("COUNT must be in hundreds, up to 500")
+    if dest.endyear < dest.year or \
+       (dest.endyear == dest.year and dest.endmonth < dest.month):
+        parser.error("End year/month must be >= start year/month")
 
 class TOP500:
     def __init__(self):
