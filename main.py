@@ -15,10 +15,11 @@ from top500.urlgen import *
 #
 # Default values for command line options
 #
-# List edition to begin scraping
-DEFAULT_YEAR = 1993
-DEFAULT_MONTH = 6
-#
+DEFAULT_YEAR = LAST_LIST.year
+DEFAULT_MONTH = LAST_LIST.month
+DEFAULT_END_YEAR = DEFAULT_YEAR
+DEFAULT_END_MONTH = DEFAULT_MONTH
+DEFAULT_COUNT = 500
 DEFAULT_OUTPUT_FILE = 'top500.csv'
 
 def parse_options(dest):
@@ -30,6 +31,12 @@ def parse_options(dest):
                         default=DEFAULT_YEAR, type=int, choices=VALID_YEARS)
     parser.add_argument('-m', '--month', help="[Start] Month of the list",
                         default=DEFAULT_MONTH, type=int, choices=VALID_MONTHS)
+    parser.add_argument('-z', '--endyear', help="Collect until this year",
+                        default=DEFAULT_END_YEAR, type=int, choices=VALID_YEARS)
+    parser.add_argument('-n', '--endmonth', help="Collect until this month",
+                        default=DEFAULT_END_MONTH, type=int, choices=VALID_MONTHS)
+    parser.add_argument('-c', '--count', default=DEFAULT_COUNT, type=int,
+                        help="Number of entries to get from each list")
     parser.add_argument('outfile', nargs='?', default=DEFAULT_OUTPUT_FILE,
                         type=argparse.FileType('w', encoding='utf-8'))
 
@@ -51,10 +58,6 @@ class TOP500:
             csvwriter.writerow(system.values())
 
     def scrape(self):
-        '''This function downloads one single page from one of the lists,
-        extracts the data from the table and stores it in a file in CSV format.
-
-        '''
         url = url_for(self.year, self.month)
         print("Downloading: %s" % url)
         page = requests.get(url)
@@ -65,7 +68,7 @@ class TOP500:
             self.systems += scraper.get_systems()
             print("Scraped %d systems" % len(self.systems))
         else:
-            print("Something went wrong: %d" % r.status_code)
+            print("Something went wrong: %d" % page.status_code)
 
 if __name__ == '__main__':
     top = TOP500()
