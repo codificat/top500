@@ -23,4 +23,4 @@ def url_for(year, month):
     'Returns the URL of the first page of the list for year/month'
     if not __is_valid(year, month):
         return None
-    return "%s/list/%s/%s" % (BASE_URL, year, month)
+    return "%s/list/%4d/%02d" % (BASE_URL, year, month)
