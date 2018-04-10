@@ -29,12 +29,14 @@ VALID_YEARS = range(FIRST_LIST.year, LAST_LIST.year + 1)
 class InvalidEdition(Exception):
     pass
 
-def __is_valid(year, month):
+def __is_valid(edition):
     'Verifies that year, month are valid list edition references'
-    return year in VALID_YEARS and month in VALID_MONTHS
+    return edition.year in VALID_YEARS and edition.month in VALID_MONTHS
 
-def url_for(year, month, page=1):
+def url_for(edition, page=1):
     'Returns the URL of a page of the top500 list for year/month'
-    if not __is_valid(year, month):
-        raise InvalidEdition('%d/%d is not a valid edition' % (year,month))
-    return "%s/list/%4d/%02d/?page=%d" % (BASE_URL, year, month, page)
+    if not __is_valid(edition):
+        raise InvalidEdition('%d/%d is not a valid edition' %
+                             (edition.year, edition.month))
+    return "%s/list/%4d/%02d/?page=%d" % (BASE_URL,
+                                          edition.year, edition.month, page)

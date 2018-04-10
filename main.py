@@ -9,6 +9,7 @@ See https://www.top500.org/
 import argparse
 import csv
 import requests
+from datetime import date
 from top500.scraper import Scraper
 from top500.urlgen import *
 
@@ -67,7 +68,7 @@ class TOP500:
             csvwriter.writerow(system.values())
 
     def scrape(self):
-        url = url_for(self.year, self.month)
+        url = url_for(date(self.year, self.month, 1))
         print("Downloading: %s" % url)
         page = requests.get(url)
         if page.status_code == 200:
