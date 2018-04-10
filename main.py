@@ -54,7 +54,7 @@ def parse_options(dest):
 
 class TOP500:
     def __init__(self):
-        self.systems = []
+        self.scraper = Scraper()
 
     def write_data(self):
         csvwriter = csv.writer(self.outfile,
@@ -62,23 +62,24 @@ class TOP500:
                                quotechar='"',
                                quoting=csv.QUOTE_MINIMAL)
         # Write column names
-        csvwriter.writerow(self.systems[0].keys())
+        csvwriter.writerow(self.scraper.get_keys())
         # Write data
-        for system in self.systems:
+        for system in self.scraper.get_systems():
             csvwriter.writerow(system.values())
 
     def scrape(self):
-        url = url_for(date(self.year, self.month, 1))
-        print("Downloading: %s" % url)
-        page = requests.get(url)
-        if page.status_code == 200:
-            print("Scraping")
-            scraper = Scraper()
-            scraper.scrape_list_page(page)
-            self.systems += scraper.get_systems()
-            print("Scraped %d systems" % len(self.systems))
-        else:
-            print("Something went wrong: %d" % page.status_code)
+        start = date(self.year, self.month, 1)
+        end = date(self.endyear, self.endmonth, 1)
+        pages = int(self.count / 100)
+        for edition in editions(start, end):
+            for page in range(pages):
+                url = url_for(edition, page+1)
+                print("Downloading: %s" % url)
+                page = requests.get(url)
+                if page.status_code == 200:
+                    self.scraper.scrape_list_page(page)
+                else:
+                    print("Something went wrong: %d" % page.status_code)
 
 if __name__ == '__main__':
     top = TOP500()

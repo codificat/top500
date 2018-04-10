@@ -103,13 +103,18 @@ class Scraper:
         # TODO: ideally set locale from page content and headers instead of
         # hardcoding
         locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
-        self.top500lists = {}
-        self.sites = {}
         self.systems = []
 
     def __add_system(self, system):
         "Adds a system to the list"
         self.systems.append(system)
+
+    def get_keys(self):
+        '''Returns a list of keys for the systems.
+        Assumes all systems have the same keys'''
+        if self.systems:
+            return self.systems[0].keys()
+        return []
 
     def get_systems(self):
         "Returns the list of scraped systems"
