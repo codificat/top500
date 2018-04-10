@@ -28,19 +28,25 @@ def parse_options(dest):
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-y', '--year', help="[Start] Year of the list",
-                        default=DEFAULT_YEAR, type=int, choices=VALID_YEARS)
+                        default=DEFAULT_YEAR, type=int,
+                        choices=VALID_YEARS)
     parser.add_argument('-m', '--month', help="[Start] Month of the list",
-                        default=DEFAULT_MONTH, type=int, choices=VALID_MONTHS)
+                        default=DEFAULT_MONTH, type=int,
+                        choices=VALID_MONTHS)
     parser.add_argument('-z', '--endyear', help="Collect until this year",
-                        default=DEFAULT_END_YEAR, type=int, choices=VALID_YEARS)
+                        default=DEFAULT_END_YEAR, type=int,
+                        choices=VALID_YEARS)
     parser.add_argument('-n', '--endmonth', help="Collect until this month",
-                        default=DEFAULT_END_MONTH, type=int, choices=VALID_MONTHS)
+                        default=DEFAULT_END_MONTH, type=int,
+                        choices=VALID_MONTHS)
     parser.add_argument('-c', '--count', default=DEFAULT_COUNT, type=int,
                         help="Number of entries to get from each list")
     parser.add_argument('outfile', nargs='?', default=DEFAULT_OUTPUT_FILE,
                         type=argparse.FileType('w', encoding='utf-8'))
-
     parser.parse_args(namespace=dest)
+
+    if dest.count < 100 or dest.count > 500 or dest.count % 100 != 0:
+        parser.error("COUNT must be in hundreds, up to 500")
 
 class TOP500:
     def __init__(self):
