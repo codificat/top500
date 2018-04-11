@@ -1,7 +1,8 @@
 
 import locale
-import re
+import requests
 from bs4 import BeautifulSoup
+from top500.urlgen import *
 
 # Columns in a site list page's table
 LIST_COLS = ('rank', 'site', 'system', 'cores', 'rmax', 'rpeak', 'power')
@@ -29,51 +30,34 @@ SYSTEM_ROWS = {
     'MPI:': 'mpi',
 }
 
-def _list_edition(page):
-    '''Identifies which edition of the list a page corresponds to,
-    based on its URL.
-    Params: page: a 'requests' Response object for the page
-    Returns: a tuple: (year, month)
-    '''
-    match = re.search(r'/list/(\d{4})/(\d{2})', page.url)
-    if not match:
-        return (None, None)
-    year = int(match.group(1))
-    month = int(match.group(2))
-    return (year, month)
+class DownloadError(Exception):
+    'A problem occurred while fetching a page with "requests.get"'
+    pass
 
-def id_from_link(link):
-    '''Expects an URL of the form "https://some.thing/some/path/XXXX
-    and returns XXXX
-    '''
-    match = re.search(r'(\d+)$', link)
-    if match:
-        return int(match.group(0))
-    return None
+def _fetch(url):
+    '''Downloads an URL and returns a 'requests' response object'''
+    print("Downloading: %s" % url)
+    page = requests.get(url)
+    if page.status_code != 200:
+        raise DownloadError("Something went wrong: %d" % page.status_code)
+    return page
 
-def _parse_system_column(system, col):
-    '''Parses a column value corresponding to a system in one of the
-    list pages. These include various system details. Such a column
-    looks like this:
+def _get_system_details(system, link):
+    '''Parses system details in the text within a link in a listing.
 
-      <td><a href="https://www.top500.org/system/SYSTEM_ID">
-          SYSTEM_NAME, PROCESSOR, INTERCONNECT, GPU
-      </a><br/>MANUFACTURER</td>
-
-    although not all systems include processor, interconnect or GPU
-    in the name column.
+    Details can include the system name, processor, interconnect or GPU.
+    Information is obtained from the text within the link and from the
+    system's dedicated details page.
 
     Params:
      - system: the dict object for the system, where system details
        will be added
-     - col: a BeautifulSoup Tag object corresponding to the TD
+     - link: a BeautifulSoup Tag object corresponding to the A
        element with the data to parse.
     '''
-    link = col.a
-    system['system_id'] = id_from_link(link['href'])
 
-    # Parse the name/processor/interconnect
-    # FIXME: some systems have GPU information in their name!!!
+    # Parse the text within the link.
+    # NOTE: some systems have GPU information in their name!!!
     # e.g. https://www.top500.org/system/177996. For these, rsplit
     # instead of split works; but this breaks others that properly
     # list multiple co-processors at the end
@@ -95,6 +79,28 @@ def _parse_system_column(system, col):
         # e.g. https://www.top500.org/system/176929
         system['gpu'] = None
 
+def _parse_system_column(system, col):
+    '''Parses a column value corresponding to a system in one of the
+    list pages. These include various system details. Such a column
+    looks like this:
+
+      <td><a href="https://www.top500.org/system/SYSTEM_ID">
+          SYSTEM_NAME, PROCESSOR, INTERCONNECT, GPU
+      </a><br/>MANUFACTURER</td>
+
+    However, the details of name, processor, interconnect or GPU
+    vary wildly across systems, so they are parsed in a specific
+    function and completed with the system details page.
+
+    Params:
+     - system: the dict object for the system, where system details
+       will be added
+     - col: a BeautifulSoup Tag object corresponding to the TD
+       element with the data to parse.
+    '''
+    link = col.a
+    system['system_id'] = id_from_link(link['href'])
+    _get_system_details(system, link)
     # Remove system details, so we're left only with manufacturer
     link.decompose()
     system['manufacturer'] = col.get_text(strip=True)
@@ -143,16 +149,14 @@ class Scraper:
         "Returns the list of scraped systems"
         return self.systems
 
-    def scrape_list_page(self, page):
+    def scrape_list_page(self, url):
         '''This function parses one single page from one of the lists,
         to extracts the data from the table
 
         '''
-        (year, month) = _list_edition(page)
-        if not year or not month:
-            # TODO something's wrong, raise an exception
-            return
+        edition = list_edition(url)
 
+        page = _fetch(url)
         soup = BeautifulSoup(page.text, 'html.parser')
 
         rows = soup.find_all('tr')
@@ -166,8 +170,8 @@ class Scraper:
                 # TODO: improve validation for the list structure
                 continue
             system = dict(rank=int(cols[0].get_text()))
-            system['year'] = year
-            system['month'] = month
+            system['year'] = edition.year
+            system['month'] = edition.month
             _parse_site_column(system, cols[1])
             _parse_system_column(system, cols[2])
             system['cores'] = locale.atoi(cols[3].get_text())

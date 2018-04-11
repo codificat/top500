@@ -8,7 +8,6 @@ See https://www.top500.org/
 
 import argparse
 import csv
-import requests
 from datetime import date
 from top500.scraper import Scraper
 from top500.urlgen import *
@@ -73,13 +72,8 @@ class TOP500:
         pages = int(self.count / 100)
         for edition in editions(start, end):
             for page in range(pages):
-                url = url_for(edition, page+1)
-                print("Downloading: %s" % url)
-                page = requests.get(url)
-                if page.status_code == 200:
-                    self.scraper.scrape_list_page(page)
-                else:
-                    print("Something went wrong: %d" % page.status_code)
+                url = url_for_list(edition, page+1)
+                self.scraper.scrape_list_page(url)
 
 if __name__ == '__main__':
     top = TOP500()
