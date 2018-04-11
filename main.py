@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 A web scraper to extract the details of the most powerful commercial
 computing systems in the world from the Top500 list.

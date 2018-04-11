@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 '''Utility functions and constants for URLs in the www.top500.org site.
 
 We assume that all lists to date have been published, and that the latest
