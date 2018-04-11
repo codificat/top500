@@ -68,18 +68,40 @@ additional information.
 
 *** List structure: sites and systems
 
-A site (col 2 in the list) looks like this:
-
-#+BEGIN_EXAMPLE
-  <td><a href="https://www.top500.org/site/SITE_ID">SITE_NAME</a><br>COUNTRY</td>
-#+END_EXAMPLE
-
-A system (col 3 in the list) looks like this:
+A system (3rd column in the list) looks like this in most cases:
 
 #+BEGIN_EXAMPLE
   <td><a href="https://www.top500.org/system/SYSTEM_ID">
-      SYSTEM_NAME
+      SYSTEM_NAME, PROCESSOR, INTERCONNECT, COPROCESSORS
   </a><br/>MANUFACTURER</td>
+#+END_EXAMPLE
+
+However:
+
+ - not all systems provide information about the processors and/or interconnect
+   in the listing page. For example, [[https://www.top500.org/system/176928][Tera-100 - Bull bullx super-node
+   S6010/S6030]].
+
+ - some systems also include GPU information, like [[https://www.top500.org/system/178467][QB-2 - Dell C8220X Cluster,
+   Intel Xeon E5-2680v2 10C 2.8GHz, Infiniband FDR, NVIDIA K20x]]. GPU information
+   is not detailed in the system details page.
+
+ - some systems have more than one type of coprocessor, e.g. [[https://www.top500.org/system/178524][Thunder - SGI ICE
+   X, Xeon E5-2699v3/E5-2697 v3, Infiniband FDR, NVIDIA Tesla K40, Intel Xeon
+   Phi 7120P]]. We bundle all of them together in the /gpu/ field.
+
+ - some systems include GPU information at the beginning of their name,
+   e.g. [[https://www.top500.org/system/177996][SANAM - Adtech, ASUS ESC4000/FDR G2, Xeon E5-2650 8C 2.000GHz, Infiniband
+   FDR, AMD FirePro S10000]].
+
+ - some systems have the order of the fields reversed, like [[https://www.top500.org/system/179200][Inspur SA5212H5,
+   Xeon E5-2682v4 16C 2.5GHz, NVIDIA Tesla P100, 25G Ethernet]] which lists the
+   interconnect after the GPU.
+
+A site (2nd column in the list) looks like this:
+
+#+BEGIN_EXAMPLE
+  <td><a href="https://www.top500.org/site/SITE_ID">SITE_NAME</a><br>COUNTRY</td>
 #+END_EXAMPLE
 
 ** System details page
@@ -92,7 +114,11 @@ Some have "(Derived)": https://www.top500.org/system/178751
 Many have no value in this field.
 
 *** Some systems evolve over time
+
+Several fields can change, including the system's name, number of cores, Rmax, Rpeak, Power, ...
+
 Examples:
+ - https://www.top500.org/system/178192
  - https://www.top500.org/system/177459
  - https://www.top500.org/system/177449
 

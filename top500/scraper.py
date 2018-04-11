@@ -58,8 +58,11 @@ def _parse_system_column(system, col):
     looks like this:
 
       <td><a href="https://www.top500.org/system/SYSTEM_ID">
-          SYSTEM_NAME
+          SYSTEM_NAME, PROCESSOR, INTERCONNECT, GPU
       </a><br/>MANUFACTURER</td>
+
+    although not all systems include processor, interconnect or GPU
+    in the name column.
 
     Params:
      - system: the dict object for the system, where system details
@@ -68,9 +71,31 @@ def _parse_system_column(system, col):
        element with the data to parse.
     '''
     link = col.a
-    system['system_url'] = link['href']
-    system['system_id'] = id_from_link(system['system_url'])
-    system['system_name'] = link.get_text(strip=True)
+    system['system_id'] = id_from_link(link['href'])
+
+    # Parse the name/processor/interconnect
+    # FIXME: some systems have GPU information in their name!!!
+    # e.g. https://www.top500.org/system/177996. For these, rsplit
+    # instead of split works; but this breaks others that properly
+    # list multiple co-processors at the end
+    parts = link.get_text(strip=True).split(',', 3)
+    system['system_name'] = parts[0].strip()
+    if len(parts) > 1:
+        system['processor'] = parts[1].strip()
+    else:
+        system['processor'] = None
+    if len(parts) > 2:
+        system['interconnect'] = parts[2].strip()
+    else:
+        system['interconnect'] = None
+    if len(parts) > 3:
+        system['gpu'] = parts[3].strip()
+    else:
+        # Assume that the missing part is GPU.
+        # FIXME: this is not true on all systems,
+        # e.g. https://www.top500.org/system/176929
+        system['gpu'] = None
+
     # Remove system details, so we're left only with manufacturer
     link.decompose()
     system['manufacturer'] = col.get_text(strip=True)
@@ -89,8 +114,7 @@ def _parse_site_column(system, col):
        element with the data to parse.
     '''
     link = col.a
-    system['site_url'] = link['href']
-    system['site_id'] = id_from_link(system['site_url'])
+    system['site_id'] = id_from_link(link['href'])
     system['site_name'] = link.get_text(strip=True)
     # Remove system details, so we're left only with the country
     link.decompose()
@@ -150,6 +174,7 @@ class Scraper:
             system['cores'] = locale.atoi(cols[3].get_text())
             system['rmax'] = locale.atof(cols[4].get_text())
             system['rpeak'] = locale.atof(cols[5].get_text())
+            # Several systems don't provide details about Power
             try:
                 system['power'] = locale.atof(cols[6].get_text())
             except ValueError:
