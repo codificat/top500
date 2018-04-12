@@ -8,9 +8,10 @@ See https://www.top500.org/
 
 import argparse
 import csv
+import sys
 from datetime import date
 from top500.scraper import Scraper
-from top500.urlgen import *
+from top500.urlgen import url_for_list, LAST_LIST, editions, VALID_YEARS, VALID_MONTHS
 
 #
 # Default values for command line options
@@ -26,22 +27,25 @@ def parse_options(dest):
     '''Parses and validate command line arguments
     '''
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-y', '--year', help="[Start] Year of the list",
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument('-y', '--year', help="Collect from year",
                         default=DEFAULT_YEAR, type=int,
                         choices=VALID_YEARS)
-    parser.add_argument('-m', '--month', help="[Start] Month of the list",
+    parser.add_argument('-m', '--month', help="Collect from month",
                         default=DEFAULT_MONTH, type=int,
                         choices=VALID_MONTHS)
-    parser.add_argument('-z', '--endyear', help="Collect until this year",
+    parser.add_argument('-z', '--endyear', help="Collect until year",
                         default=DEFAULT_END_YEAR, type=int,
                         choices=VALID_YEARS)
-    parser.add_argument('-n', '--endmonth', help="Collect until this month",
+    parser.add_argument('-n', '--endmonth', help="Collect until month",
                         default=DEFAULT_END_MONTH, type=int,
                         choices=VALID_MONTHS)
     parser.add_argument('-c', '--count', default=DEFAULT_COUNT, type=int,
                         help="Number of entries to get from each list")
     parser.add_argument('outfile', nargs='?', default=DEFAULT_OUTPUT_FILE,
+                        help="Output file",
                         type=argparse.FileType('w', encoding='utf-8'))
     parser.parse_args(namespace=dest)
 
@@ -53,6 +57,12 @@ def parse_options(dest):
 
 class TOP500:
     def __init__(self):
+        self.year = DEFAULT_YEAR
+        self.month = DEFAULT_MONTH
+        self.endyear = DEFAULT_END_YEAR
+        self.endmonth = DEFAULT_END_MONTH
+        self.count = DEFAULT_COUNT
+        self.outfile = sys.stdout
         self.scraper = Scraper()
 
     def write_data(self):
