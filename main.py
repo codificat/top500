@@ -60,11 +60,11 @@ class TOP500:
                                delimiter=',',
                                quotechar='"',
                                quoting=csv.QUOTE_MINIMAL)
-        # Write column names
+        # Write header (column names)
         csvwriter.writerow(self.scraper.get_keys())
         # Write data
-        for system in self.scraper.get_systems():
-            csvwriter.writerow(system.values())
+        for entry in self.scraper.get_list():
+            csvwriter.writerow(entry.values())
 
     def scrape(self):
         start = date(self.year, self.month, 1)
@@ -76,7 +76,7 @@ class TOP500:
                 self.scraper.scrape_list_page(url)
 
 if __name__ == '__main__':
-    top = TOP500()
+    top = TOP500()  # pylint: disable=invalid-name
     parse_options(top)
     top.scrape()
     top.write_data()

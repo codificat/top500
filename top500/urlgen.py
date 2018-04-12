@@ -104,4 +104,4 @@ if __name__ == '__main__':
     # Debug: list all the URLs this module would generate for
     # all the editions of the TOP500 list (only 1st page)
     for list_edition in editions(FIRST_LIST, LAST_LIST):
-        print(url_for(list_edition))
+        print(url_for_list(list_edition))
