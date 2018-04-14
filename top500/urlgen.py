@@ -84,11 +84,11 @@ def editions(start, end):
 
 def url_for_system(system_id):
     'Returns the URL of a system from its ID'
-    return "%s/system/%d" % (BASE_URL, system_id)
+    return "%s/system/%d" % (BASE_URL, int(system_id))
 
 def url_for_site(site_id):
     'Returns the URL of a site from its ID'
-    return "%s/site/%d" % (BASE_URL, site_id)
+    return "%s/site/%d" % (BASE_URL, int(site_id))
 
 def url_for_list(edition, page=1):
     '''Returns the URL of a page of the top500 list for a specific edition.

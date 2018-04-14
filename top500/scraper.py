@@ -1,18 +1,18 @@
 
 import locale
+import re
 import requests
 from bs4 import BeautifulSoup
-from top500.urlgen import id_from_link, list_edition
+from top500.urlgen import id_from_link, list_edition, url_for_system
 
-# Columns in a site list page's table
-LIST_COLS = ('rank', 'site', 'system', 'cores', 'rmax', 'rpeak', 'power')
-
-# The list of rows with details about a site, on the site's details page
-SITE_ROWS = ('URL', 'Segment', 'City', 'Country')
-
-# The list of rows on a system's details page
-SYSTEM_ROWS = {
-    'Site:': 'site',
+# The list of fields we know about for a system.
+# This is a dictionary where the keys are the name of the fields
+# as found in the TOP500 system details page (i.e. the table headers),
+# and the values are the resulting name of the field (i.e. what will be
+# stored in the generated data set).
+SYSTEM_FIELDS = {
+    'Site:': 'site_name',
+    'System URL:': 'system_url',
     'Manufacturer:': 'manufacturer',
     'Cores:': 'cores',
     'Memory:': 'memory',
@@ -28,7 +28,42 @@ SYSTEM_ROWS = {
     'Compiler:': 'compiler',
     'Math Library:': 'math',
     'MPI:': 'mpi',
+    # Fields that don't come directly from full column values:
+    'gpu': 'gpu',             # the coprocessor/GPU is a sub-field
+    'country': 'country',     # country is a sub-field in the listings
+    'site_id': 'site_id',     # site_id is taken from its URL
+    'system_id': 'system_id', # the system_id is taken from its URL
+    'name': 'name',           # the name is a sub-field in the listing
 }
+
+# The complete list of fields that we store for each list entry.
+# This is: the fields about a system's details, plus the list edition
+# (year and month) and the corresponding rank.
+ENTRY_FIELDS = list(SYSTEM_FIELDS.values()) + ['year', 'month', 'rank']
+
+# Which columns do we find in a TOP500 list page's table.
+# Note that the table in the highlights page for each edition (the page
+# that only lists the top 10 systems) has one less column (it combines
+# site and system). We don't scrape that page as it's redundant.
+LIST_COLS = ('rank', 'site', 'system', 'cores', 'rmax', 'rpeak', 'power')
+
+# The list of rows with details about a site, on the site's details page
+SITE_ROWS = {
+    'URL': 'site_url',
+    'City': 'city',
+    'Country': 'country',
+    'Segment': 'segment'
+}
+
+# Fields that store numeric values. These will be cleaned up (some entries
+# include units) and their type will be updated
+INTEGER_FIELDS = ('memory', 'cores', 'nmax', 'nhalf')
+FLOAT_FIELDS = ('rmax', 'rpeak', 'power', 'hpcg')
+NUMERIC_FIELDS = INTEGER_FIELDS + FLOAT_FIELDS
+
+# The site uses the en_US locale with UTF8 encoding. Setting this for
+# the number parsing functions (i.e. separators)
+locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 class DownloadError(Exception):
     'A problem occurred while fetching a page with "requests.get"'
@@ -62,29 +97,88 @@ def _parse_site_column(system, col):
     link.decompose()
     system['country'] = col.get_text(strip=True)
 
+def _numeric_value(var, val):
+    '''Clean up a value for a numeric variable:
+       - remove any text on it (e.g. units, thousands separators)
+       - use correct type
+    '''
+    match = re.match(r'([\d,.]+)', val)
+    if not match:
+        # The provided value doesn't start with a number
+        return val
+    value = match.group(0)
+    if var in INTEGER_FIELDS:
+        value = locale.atoi(value)
+    elif var in FLOAT_FIELDS:
+        value = locale.atof(value)
+    return value
+
+def _scrape_system_page(system_id):
+    '''Downloads and scrapes a system's details page.
+    Sample row from a details page:
+
+        <tr>
+            <th>Cores:</th>
+            <td>12,345</td>
+        </tr>
+
+    Returns a dictionary of system properties.'''
+
+    system = dict.fromkeys(ENTRY_FIELDS)
+    system['system_id'] = system_id
+    page = _fetch(url_for_system(system_id))
+    soup = BeautifulSoup(page.text, 'html.parser')
+
+    # There are two tables in a system details page: the details
+    # themselves and the history of ranks. We scrape the first one.
+    for row in soup.table.find_all('tr'):
+        try:
+            header = row.th
+            if header.has_attr('colspan'):
+                # This row is a title/category, it doesn't contain any variable
+                continue
+            fieldname = header.get_text(strip=True)
+            variable = SYSTEM_FIELDS[fieldname]
+            value = row.td.get_text(strip=True)
+            if variable in NUMERIC_FIELDS:
+                value = _numeric_value(variable, value)
+            # TODO: clean up values: remove units (TFlop/s, kW, ...) and convert
+            # types. Note that this is not necessary for some fields like cores,
+            # rmax or rmax, as they will be overriden by the values from the
+            # list's page, which are more current.
+        except KeyError:
+            print("Igoring unkown detail '%s' in system %s" %
+                  (fieldname, system_id))
+            continue
+        system[variable] = value
+
+    return system
+
 class Scraper:
     "scrappety scrap"
 
     def __init__(self):
-        # TODO: ideally set locale from page content and headers instead of
-        # hardcoding
-        locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
         self.systems = {}
         self.entries = []
 
     def __add_list_entry(self, entry):
         "Adds a system entry to the list"
-        self.systems[entry['system_id']] = entry
         self.entries.append(entry)
 
-    def __fetch_system(self, sys_id):
+    def __get_system_details(self, system_id):
+        '''Find details about a system. Check if we scraped its details before,
+        and if not, scrape them.
+        Note: we don't add the scraped system to the cache here, we only add it
+        when all details are scraped - i.e. we cache full list entries. This saves
+        a bit of time and memory.
+        '''
         try:
-            known = self.systems[sys_id]
+            system = self.systems[system_id]
         except KeyError:
-            known = {}
-        return known
+            system = _scrape_system_page(system_id)
+        return system
 
-    def __get_system_details(self, system, link):
+    def __parse_system_details(self, system, link):
         '''Parses system details in the text within a link in a listing.
 
         Details can include the system name, processor, interconnect or GPU.
@@ -93,17 +187,15 @@ class Scraper:
 
         Params:
          - system: the dict object for the system, where system details
-           will be added
+           will be added. It must already have its system_id filled in
          - link: a BeautifulSoup Tag object corresponding to the A
            element with the data to parse.
         '''
 
-        details = self.__fetch_system(system['system_id'])
-        if details:
-            print("cached info for system %s" % system['system_id'])
-            fields = ('system_name', 'processor', 'interconnect', 'gpu')
-            system.update({field:details[field] for field in fields})
-            return
+        details = self.__get_system_details(system['system_id'])
+        # Update only the fields that we found about
+        system.update({field: details[field]
+                       for field in ENTRY_FIELDS if details[field]})
 
         # Parse the text within the link.
         # NOTE: some systems have GPU information in their name!!!
@@ -111,7 +203,7 @@ class Scraper:
         # instead of split works; but this breaks others that properly
         # list multiple co-processors at the end
         parts = link.get_text(strip=True).split(',', 3)
-        system['system_name'] = parts[0].strip()
+        system['name'] = parts[0].strip()
         if len(parts) > 1:
             system['processor'] = parts[1].strip()
         else:
@@ -149,17 +241,18 @@ class Scraper:
         '''
         link = col.a
         system['system_id'] = id_from_link(link['href'])
-        self.__get_system_details(system, link)
+        self.__parse_system_details(system, link)
         # Remove system details, so we're left only with manufacturer
         link.decompose()
         system['manufacturer'] = col.get_text(strip=True)
 
     def get_keys(self):
-        '''Returns a list of keys (variable names) for systems.
-        Assumes all entries in the list have the same keys'''
-        if self.entries:
-            return self.entries[0].keys()
-        return LIST_COLS
+        '''Returns a list of keys (variable names) for list entries.
+        If the entries list is empty (no data yet) it returns None.
+        '''
+        if not self.entries:
+            return None
+        return ENTRY_FIELDS
 
     def get_list(self):
         "Returns the list of scraped systems"
@@ -176,7 +269,12 @@ class Scraper:
         soup = BeautifulSoup(page.text, 'html.parser')
 
         rows = soup.find_all('tr')
+        count = 1 #DEBUG
         for row in rows:
+            if count > 10:
+                break
+            count++
+            
             cols = row.find_all('td')
             if not cols or len(cols) != len(LIST_COLS):
                 # If there are no TDs in this row it means we must be
@@ -185,18 +283,19 @@ class Scraper:
                 # we check we have so many cols.
                 # TODO: improve validation for the list structure
                 continue
-            system = dict(rank=int(cols[0].get_text()))
-            system['year'] = edition.year
-            system['month'] = edition.month
-            _parse_site_column(system, cols[1])
-            self.__parse_system_column(system, cols[2])
-            system['cores'] = locale.atoi(cols[3].get_text())
-            system['rmax'] = locale.atof(cols[4].get_text())
-            system['rpeak'] = locale.atof(cols[5].get_text())
+            entry = dict.fromkeys(ENTRY_FIELDS)
+            entry['rank'] = int(cols[0].get_text())
+            entry['year'] = edition.year
+            entry['month'] = edition.month
+            _parse_site_column(entry, cols[1])
+            self.__parse_system_column(entry, cols[2])
+            entry['cores'] = locale.atoi(cols[3].get_text())
+            entry['rmax'] = locale.atof(cols[4].get_text())
+            entry['rpeak'] = locale.atof(cols[5].get_text())
             # Several systems don't provide details about Power
             try:
-                system['power'] = locale.atof(cols[6].get_text())
+                entry['power'] = locale.atof(cols[6].get_text())
             except ValueError:
-                system['power'] = None
+                entry['power'] = None
 
-            self.__add_list_entry(system)
+            self.__add_list_entry(entry)
