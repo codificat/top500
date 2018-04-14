@@ -76,10 +76,10 @@ class DownloadError(Exception):
     'A problem occurred while fetching a page with "requests.get"'
     pass
 
-def _fetch(url):
+def _fetch(url, session):
     '''Downloads an URL and returns a 'requests' response object'''
     print("-- Downloading: %s" % url)
-    page = requests.get(url)
+    page = session.get(url)
     if page.status_code != 200:
         raise DownloadError("Something went wrong: %d" % page.status_code)
     return page
@@ -120,43 +120,6 @@ def _numeric_value(var, val):
         value = locale.atof(value)
     return value
 
-def _scrape_system_page(system_id):
-    '''Downloads and scrapes a system's details page.
-    Sample row from a details page:
-
-        <tr>
-            <th>Cores:</th>
-            <td>12,345</td>
-        </tr>
-
-    Returns a dictionary of system properties.'''
-
-    system = dict.fromkeys(ENTRY_FIELDS)
-    system['system_id'] = system_id
-    page = _fetch(url_for_system(system_id))
-    soup = BeautifulSoup(page.text, 'html.parser')
-
-    # There are two tables in a system details page: the details
-    # themselves and the history of ranks. We scrape the first one.
-    for row in soup.table.find_all('tr'):
-        try:
-            header = row.th
-            if header.has_attr('colspan'):
-                # This row is a title/category, it doesn't contain any variable
-                continue
-            fieldname = header.get_text(strip=True)
-            variable = SYSTEM_FIELDS[fieldname]
-            value = row.td.get_text(strip=True)
-            if variable in NUMERIC_FIELDS:
-                value = _numeric_value(variable, value)
-        except KeyError:
-            print("Igoring unkown detail '%s' in system %s" %
-                  (fieldname, system_id))
-            continue
-        system[variable] = value
-
-    return system
-
 def _could_be(part1, part2):
     '''Helper function for fuzzy_remove: check if 2 items could be the same
     component/variable value'''
@@ -195,6 +158,7 @@ class Scraper:
         self.sites = {}
         self.systems = {}
         self.entries = []
+        self.session = requests.Session()
 
     def __add_list_entry(self, entry):
         "Adds a system entry to the list"
@@ -204,6 +168,43 @@ class Scraper:
         self.entries.append(entry)
         if self.entry_callback:
             self.entry_callback(entry)
+
+    def _scrape_system_page(self, system_id):
+        '''Downloads and scrapes a system's details page.
+        Sample row from a details page:
+
+            <tr>
+                <th>Cores:</th>
+                <td>12,345</td>
+            </tr>
+
+        Returns a dictionary of system properties.'''
+
+        system = dict.fromkeys(ENTRY_FIELDS)
+        system['system_id'] = system_id
+        page = _fetch(url_for_system(system_id), self.session)
+        soup = BeautifulSoup(page.text, 'html.parser')
+
+        # There are two tables in a system details page: the details
+        # themselves and the history of ranks. We scrape the first one.
+        for row in soup.table.find_all('tr'):
+            try:
+                header = row.th
+                if header.has_attr('colspan'):
+                    # This row is a title/category, it doesn't contain any variable
+                    continue
+                fieldname = header.get_text(strip=True)
+                variable = SYSTEM_FIELDS[fieldname]
+                value = row.td.get_text(strip=True)
+                if variable in NUMERIC_FIELDS:
+                    value = _numeric_value(variable, value)
+            except KeyError:
+                print("Igoring unkown detail '%s' in system %s" %
+                      (fieldname, system_id))
+                continue
+            system[variable] = value
+
+        return system
 
     def __get_system_details(self, system_id):
         '''Find details about a system. Check if we scraped its details before,
@@ -215,7 +216,7 @@ class Scraper:
         try:
             system = self.systems[system_id]
         except KeyError:
-            system = _scrape_system_page(system_id)
+            system = self._scrape_system_page(system_id)
         return system
 
     def __parse_system_details(self, system, link):
@@ -300,7 +301,7 @@ class Scraper:
         '''
         edition = list_edition(url)
 
-        page = _fetch(url)
+        page = _fetch(url, self.session)
         soup = BeautifulSoup(page.text, 'html.parser')
 
         rows = soup.find_all('tr')
