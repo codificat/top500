@@ -49,14 +49,6 @@ ENTRY_FIELDS = list(SYSTEM_FIELDS.values()) + ['year', 'month', 'rank']
 # site and system). We don't scrape that page as it's redundant.
 LIST_COLS = ('rank', 'site', 'system', 'cores', 'rmax', 'rpeak', 'power')
 
-# The list of rows with details about a site, on the site's details page
-SITE_ROWS = {
-    'URL': 'site_url',
-    'City': 'city',
-    'Country': 'country',
-    'Segment': 'segment'
-}
-
 # Fields that store numeric values. These will be cleaned up (some entries
 # include units) and their type will be updated
 INTEGER_FIELDS = ('memory', 'cores', 'nmax', 'nhalf')
