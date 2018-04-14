@@ -71,7 +71,7 @@ class DownloadError(Exception):
 
 def _fetch(url):
     '''Downloads an URL and returns a 'requests' response object'''
-    print("Downloading: %s" % url)
+    print("-- Downloading: %s" % url)
     page = requests.get(url)
     if page.status_code != 200:
         raise DownloadError("Something went wrong: %d" % page.status_code)
@@ -269,9 +269,11 @@ class Scraper:
         soup = BeautifulSoup(page.text, 'html.parser')
 
         rows = soup.find_all('tr')
-        count = 1
+        count = 0
         for row in rows:
             if count > limit:
+                print("... Partial scraping of %d entries from the page"
+                      % limit)
                 break
             count += 1
 
@@ -281,7 +283,6 @@ class Scraper:
                 # in the header row, which uses TH instead of TD.
                 # The code below assumes LIST_COLS are present, so
                 # we check we have so many cols.
-                # TODO: improve validation for the list structure
                 continue
             entry = dict.fromkeys(ENTRY_FIELDS)
             entry['rank'] = int(cols[0].get_text())

@@ -75,12 +75,14 @@ class TOP500:
                                quotechar='"',
                                quoting=csv.QUOTE_MINIMAL)
         columns = self.scraper.get_keys()
-        if columns:
+        entries = self.scraper.get_list()
+        if entries:
             # Write header (column names)
             csvwriter.writerow(self.scraper.get_keys())
             # Write data
-            for entry in self.scraper.get_list():
+            for entry in entries:
                 csvwriter.writerow(entry.values())
+            print("Wrote a total of %d entries" % len(entries))
 
     def scrape(self):
         start = date(self.year, self.month, 1)
@@ -91,9 +93,12 @@ class TOP500:
             # The user requested a partial page
             pages += 1
         for edition in editions(start, end):
+            print("* Scraping edition: %d/%d" % (edition.year, edition.month))
             for page in range(pages):
-                url = url_for_list(edition, page+1)
-                if page == pages-1 and limit:
+                pagenum = page + 1
+                print("** Page %d" % pagenum)
+                url = url_for_list(edition, pagenum)
+                if pagenum == pages and limit:
                     # Only partially parse the last page as requested
                     self.scraper.scrape_list_page(url, limit)
                 else:
