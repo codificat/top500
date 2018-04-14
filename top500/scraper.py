@@ -1,3 +1,4 @@
+'''Scraper for the TOP500 list pages'''
 
 import locale
 import re
@@ -159,11 +160,9 @@ def _scrape_system_page(system_id):
 def _could_be(part1, part2):
     '''Helper function for fuzzy_remove: check if 2 items could be the same
     component/variable value'''
-    if part1 == part2 or part1 in part2 or part2 in part1:
-        return True
+    #if part1 == part2 or part1 in part2 or part2 in part1:
+    #    return True
     could_be = SequenceMatcher(None, part1, part2).ratio() > SM_RATIO
-    if could_be:
-        print("DEBUG: '%s' ~ '%s'" % (part1, part2))
     return could_be
 
 def _fuzzy_remove(parts, system):
@@ -179,24 +178,32 @@ def _fuzzy_remove(parts, system):
     toremove = []
     for part in parts:
         if system['processor'] and _could_be(part, system['processor']):
-            toremove.append(part)
+            if not part in toremove:
+                toremove.append(part)
         if system['interconnect'] and _could_be(part, system['interconnect']):
-            toremove.append(part)
+            if not part in toremove:
+                toremove.append(part)
     for part in toremove:
         parts.remove(part)
 
-    #print('DEBUG: resulting parts: %s' % parts)
 
 class Scraper:
     "scrappety scrap"
 
-    def __init__(self):
+    def __init__(self, entry_callback=None):
+        self.entry_callback = entry_callback
+        self.sites = {}
         self.systems = {}
         self.entries = []
 
     def __add_list_entry(self, entry):
         "Adds a system entry to the list"
+        # We cache systems by their ID, so we don't have to re-scrape their
+        # details pages.
+        self.systems[entry['system_id']] = entry
         self.entries.append(entry)
+        if self.entry_callback:
+            self.entry_callback(entry)
 
     def __get_system_details(self, system_id):
         '''Find details about a system. Check if we scraped its details before,
@@ -278,13 +285,9 @@ class Scraper:
         link.decompose()
         system['manufacturer'] = col.get_text(strip=True)
 
-    def get_keys(self):
-        '''Returns a list of keys (variable names) for list entries.
-        If the entries list is empty (no data yet) it returns None.
-        '''
-        if not self.entries:
-            return None
-        return ENTRY_FIELDS
+    def set_entry_callback(self, callback):
+        'Sets the callback function to be called when a list entry is added'
+        self.entry_callback = callback
 
     def get_list(self):
         "Returns the list of scraped systems"

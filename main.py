@@ -10,7 +10,7 @@ import argparse
 import csv
 import sys
 from datetime import date
-from top500.scraper import Scraper
+from top500.scraper import Scraper, ENTRY_FIELDS
 from top500.urlgen import url_for_list, LAST_LIST, editions, VALID_YEARS, VALID_MONTHS
 
 #
@@ -60,6 +60,9 @@ def parse_options(dest):
         parser.error("End year/month must be >= start year/month")
 
 class TOP500:
+    '''Main logic for the TOP500 website scraping'''
+
+    # pylint: disable=too-many-instance-attributes
     def __init__(self):
         self.year = DEFAULT_YEAR
         self.month = DEFAULT_MONTH
@@ -67,24 +70,43 @@ class TOP500:
         self.endmonth = DEFAULT_END_MONTH
         self.count = DEFAULT_COUNT
         self.outfile = sys.stdout
+        self.csvwriter = None
         self.scraper = Scraper()
 
-    def write_data(self):
-        csvwriter = csv.writer(self.outfile,
-                               delimiter=',',
-                               quotechar='"',
-                               quoting=csv.QUOTE_MINIMAL)
-        columns = self.scraper.get_keys()
+    def init_writer(self):
+        '''Initialize the CSV writer on top of the output file. This is not done
+        inside __init__ to allow options to set a differnt outfile
+        '''
+        self.csvwriter = csv.writer(self.outfile,
+                                    delimiter=',',
+                                    quotechar='"',
+                                    quoting=csv.QUOTE_MINIMAL)
+        # Write header (column names)
+        self.csvwriter.writerow(ENTRY_FIELDS)
+
+    def write_entry(self, entry):
+        'Writes an entry to the output file in CSV format'
+        self.csvwriter.writerow(entry.values())
+
+    def write_all(self):
+        '''Alternative approach to writing: when calling scrape() with
+        write=False, no entries will be written to the file during the
+        scraping process. You can then call write_all() to write them
+        all at once.'''
+        self.init_writer()
         entries = self.scraper.get_list()
         if entries:
-            # Write header (column names)
-            csvwriter.writerow(self.scraper.get_keys())
-            # Write data
             for entry in entries:
-                csvwriter.writerow(entry.values())
+                self.csvwriter.writerow(entry.values())
             print("Wrote a total of %d entries" % len(entries))
 
-    def scrape(self):
+    def scrape(self, write=True):
+        '''Scraping function. It drives the scraping by obtaining each of
+        the list's pages and calling the scraper for each.'''
+        if write:
+            self.init_writer()
+            self.scraper.set_entry_callback(self.write_entry)
+
         start = date(self.year, self.month, 1)
         end = date(self.endyear, self.endmonth, 1)
         pages = int(self.count / 100)
@@ -93,10 +115,10 @@ class TOP500:
             # The user requested a partial page
             pages += 1
         for edition in editions(start, end):
-            print("* Scraping edition: %d/%d" % (edition.year, edition.month))
+            print("* Scraping TOP500 list edition: %d/%d" % (edition.year, edition.month))
             for page in range(pages):
                 pagenum = page + 1
-                print("** Page %d" % pagenum)
+                print("** Page %d of %d" % (pagenum, pages))
                 url = url_for_list(edition, pagenum)
                 if pagenum == pages and limit:
                     # Only partially parse the last page as requested
@@ -105,7 +127,6 @@ class TOP500:
                     self.scraper.scrape_list_page(url)
 
 if __name__ == '__main__':
-    top = TOP500()  # pylint: disable=invalid-name
-    parse_options(top)
-    top.scrape()
-    top.write_data()
+    top500 = TOP500()  # pylint: disable=invalid-name
+    parse_options(top500)
+    top500.scrape()
