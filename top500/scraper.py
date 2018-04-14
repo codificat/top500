@@ -258,7 +258,7 @@ class Scraper:
         "Returns the list of scraped systems"
         return self.entries
 
-    def scrape_list_page(self, url):
+    def scrape_list_page(self, url, limit=100):
         '''This function parses one single page from one of the lists,
         to extracts the data from the table
 
@@ -269,12 +269,12 @@ class Scraper:
         soup = BeautifulSoup(page.text, 'html.parser')
 
         rows = soup.find_all('tr')
-        count = 1 #DEBUG
+        count = 1
         for row in rows:
-            if count > 10:
+            if count > limit:
                 break
-            count++
-            
+            count += 1
+
             cols = row.find_all('td')
             if not cols or len(cols) != len(LIST_COLS):
                 # If there are no TDs in this row it means we must be

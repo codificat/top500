@@ -43,14 +43,18 @@ def parse_options(dest):
                         default=DEFAULT_END_MONTH, type=int,
                         choices=VALID_MONTHS)
     parser.add_argument('-c', '--count', default=DEFAULT_COUNT, type=int,
-                        help="Number of entries to get from each list")
+                        help="Number of entries to get from each edition")
+    parser.add_argument('-f', '--force', action='store_true',
+                        help="Force a partial count")
     parser.add_argument('outfile', nargs='?', default=DEFAULT_OUTPUT_FILE,
                         help="Output file",
                         type=argparse.FileType('w', encoding='utf-8'))
     parser.parse_args(namespace=dest)
 
-    if dest.count < 100 or dest.count > 500 or dest.count % 100 != 0:
-        parser.error("COUNT must be in hundreds, up to 500")
+    if dest.count < 1 or dest.count > 500:
+        parser.error("COUNT must be >1 and <500 (in hundreds unless forced)")
+    if dest.count % 100 != 0 and not dest.force:
+        parser.error("COUNT must be in hundreds. Use --force to override")
     if dest.endyear < dest.year or \
        (dest.endyear == dest.year and dest.endmonth < dest.month):
         parser.error("End year/month must be >= start year/month")
@@ -70,20 +74,30 @@ class TOP500:
                                delimiter=',',
                                quotechar='"',
                                quoting=csv.QUOTE_MINIMAL)
-        # Write header (column names)
-        csvwriter.writerow(self.scraper.get_keys())
-        # Write data
-        for entry in self.scraper.get_list():
-            csvwriter.writerow(entry.values())
+        columns = self.scraper.get_keys()
+        if columns:
+            # Write header (column names)
+            csvwriter.writerow(self.scraper.get_keys())
+            # Write data
+            for entry in self.scraper.get_list():
+                csvwriter.writerow(entry.values())
 
     def scrape(self):
         start = date(self.year, self.month, 1)
         end = date(self.endyear, self.endmonth, 1)
         pages = int(self.count / 100)
+        limit = self.count % 100
+        if limit:
+            # The user requested a partial page
+            pages += 1
         for edition in editions(start, end):
             for page in range(pages):
                 url = url_for_list(edition, page+1)
-                self.scraper.scrape_list_page(url)
+                if page == pages-1 and limit:
+                    # Only partially parse the last page as requested
+                    self.scraper.scrape_list_page(url, limit)
+                else:
+                    self.scraper.scrape_list_page(url)
 
 if __name__ == '__main__':
     top = TOP500()  # pylint: disable=invalid-name
