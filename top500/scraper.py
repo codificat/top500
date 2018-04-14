@@ -58,7 +58,7 @@ NUMERIC_FIELDS = INTEGER_FIELDS + FLOAT_FIELDS
 # The minimum ratio for difflib's SequenceMatcher to accept two strings
 # as equal. This is used when cleaning up a system's listing entry by
 # removing details about known other fields (processor, interconnect)
-SM_RATIO = 0.7
+SM_RATIO = 0.79
 
 # The site uses the en_US locale with UTF8 encoding. Setting this for
 # the number parsing functions (i.e. separators)
