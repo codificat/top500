@@ -1,6 +1,7 @@
 
 import locale
 import re
+from difflib import SequenceMatcher
 import requests
 from bs4 import BeautifulSoup
 from top500.urlgen import id_from_link, list_edition, url_for_system
@@ -60,6 +61,11 @@ SITE_ROWS = {
 INTEGER_FIELDS = ('memory', 'cores', 'nmax', 'nhalf')
 FLOAT_FIELDS = ('rmax', 'rpeak', 'power', 'hpcg')
 NUMERIC_FIELDS = INTEGER_FIELDS + FLOAT_FIELDS
+
+# The minimum ratio for difflib's SequenceMatcher to accept two strings
+# as equal. This is used when cleaning up a system's listing entry by
+# removing details about known other fields (processor, interconnect)
+SM_RATIO = 0.7
 
 # The site uses the en_US locale with UTF8 encoding. Setting this for
 # the number parsing functions (i.e. separators)
@@ -142,10 +148,6 @@ def _scrape_system_page(system_id):
             value = row.td.get_text(strip=True)
             if variable in NUMERIC_FIELDS:
                 value = _numeric_value(variable, value)
-            # TODO: clean up values: remove units (TFlop/s, kW, ...) and convert
-            # types. Note that this is not necessary for some fields like cores,
-            # rmax or rmax, as they will be overriden by the values from the
-            # list's page, which are more current.
         except KeyError:
             print("Igoring unkown detail '%s' in system %s" %
                   (fieldname, system_id))
@@ -153,6 +155,37 @@ def _scrape_system_page(system_id):
         system[variable] = value
 
     return system
+
+def _could_be(part1, part2):
+    '''Helper function for fuzzy_remove: check if 2 items could be the same
+    component/variable value'''
+    if part1 == part2 or part1 in part2 or part2 in part1:
+        return True
+    could_be = SequenceMatcher(None, part1, part2).ratio() > SM_RATIO
+    if could_be:
+        print("DEBUG: '%s' ~ '%s'" % (part1, part2))
+    return could_be
+
+def _fuzzy_remove(parts, system):
+    '''Attempts to detect known system parts to remove them, comparing strings
+    with difflib's SequenceMatcher allowing "close enough" matches.
+
+    For example, system 177556 has these parts in its listing name:
+    ['Sequoia-BlueGene/Q', 'Power BQC 16C 1.60 GHz', 'Custom']
+
+    In its details page, though, the interconnect is 'Custom Interconnect', and
+    the processor is 'Power BQC 16C 1.6GHz'
+    '''
+    toremove = []
+    for part in parts:
+        if system['processor'] and _could_be(part, system['processor']):
+            toremove.append(part)
+        if system['interconnect'] and _could_be(part, system['interconnect']):
+            toremove.append(part)
+    for part in toremove:
+        parts.remove(part)
+
+    #print('DEBUG: resulting parts: %s' % parts)
 
 class Scraper:
     "scrappety scrap"
@@ -198,27 +231,26 @@ class Scraper:
                        for field in ENTRY_FIELDS if details[field]})
 
         # Parse the text within the link.
-        # NOTE: some systems have GPU information in their name!!!
-        # e.g. https://www.top500.org/system/177996. For these, rsplit
-        # instead of split works; but this breaks others that properly
-        # list multiple co-processors at the end
-        parts = link.get_text(strip=True).split(',', 3)
-        system['name'] = parts[0].strip()
-        if len(parts) > 1:
-            system['processor'] = parts[1].strip()
+        parts = link.get_text(strip=True).split(',')
+        parts = [x.strip() for x in parts]
+
+        # Remove the components that we already have in the details
+        _fuzzy_remove(parts, system)
+
+        # Once the interconnect and processor are removed, the first
+        # element is assumed to be the system name
+        if parts:
+            system['name'] = parts.pop(0)
         else:
-            system['processor'] = None
-        if len(parts) > 2:
-            system['interconnect'] = parts[2].strip()
-        else:
-            system['interconnect'] = None
-        if len(parts) > 3:
-            system['gpu'] = parts[3].strip()
-        else:
-            # Assume that the missing part is GPU.
-            # FIXME: this is not true on all systems,
-            # e.g. https://www.top500.org/system/176929
-            system['gpu'] = None
+            # If we are here it very likely means we should tune SM_RATIO
+            # because it removed all parts thinking they belonged elsewhere
+            print('... Warning: System without name')
+            system['name'] = 'Unknown'
+
+        # Any remaining content is assumed to be the GPU/co-processor.
+        # It should be one part, but some systems have extra content.
+        if parts:
+            system['gpu'] = ', '.join(parts)
 
     def __parse_system_column(self, system, col):
         '''Parses a column value corresponding to a system in one of the
