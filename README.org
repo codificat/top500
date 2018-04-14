@@ -1,3 +1,8 @@
+#+TITLE: TOP500 list web scraping
+#+DATE: <2018-04-12 Thu>
+#+AUTHOR: Pep Turró Mauri
+#+LANGUAGE: en
+
 * TOP500 list web scraping
 
 This is a project to do web scraping of the [[https://www.top500.org/][TOP500 list]], which is a list of the
@@ -6,6 +11,7 @@ This is a project to do web scraping of the [[https://www.top500.org/][TOP500 li
 The goal of this project is to extract the details of the computers from the
 lists presented in the web site as HTML tables and store them in CSV format for
 later processing.
+
 ** The www.top500.org web site structure
 
 The lists are created twice a year (in June and November each year), and the web
@@ -27,6 +33,8 @@ Details of the collected information are available on their [[https://www.top500
 
 ** robots.txt
 
+The site has a very tolerant ~robots.txt~ file:
+
 #+BEGIN_EXAMPLE
 $ curl https://www.top500.org/robots.txt
 User-agent: *
@@ -35,19 +43,81 @@ Allow: /
 Host: www.top500.org
 #+END_EXAMPLE
 
+* Usage
+
+#+BEGIN_EXAMPLE
+$ python3 scrape.py -h
+usage: scrape.py [-h]
+                 [-y {1993,...,2017}]
+                 [-m {6,11}]
+                 [-z {1993,...,2017}]
+                 [-n {6,11}] [-c COUNT] [-f]
+                 [outfile]
+
+positional arguments:
+  outfile               Output file (default: top500.csv)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -y {1993,...,2017}, --year {1993,...,2017}
+                        Collect from year (default: 2017)
+  -m {6,11}, --month {6,11}
+                        Collect from month (default: 11)
+  -z {1993,...,2017}, --endyear {1993,...,2017}
+                        Collect until year (default: 2017)
+  -n {6,11}, --endmonth {6,11}
+                        Collect until month (default: 11)
+  -c COUNT, --count COUNT
+                        Number of entries to get from each edition (default:
+                        500)
+  -f, --force           Force a partial count (default: False)
+#+END_EXAMPLE
+
+In summary: if invoked without arguments, ~scrape.py~ will download the whole
+list for the latest available edition (at the time of the writing, this is
+November 2017; this is calculated at run time), i.e. 500 entries.
+
+You can specify a starting edition with ~--year~ and/or ~--month~, and it will
+start from there. It will continue until the latest edition, or you can specify
+the last edition to collect with ~--endyear~ and/or ~--endmonth~.
+
+By default it collects all 500 systems for each edition. You can change that
+with ~--count~ (this specifies the number of systems to collect /per edition/,
+not the total number of entries to collect - which doesn't make that much sense).
+
+Because the lists are hosted in pages of 100 entries each, by default ~--count~
+only accepts values in hundreds (100, 200, 300, ...) to make the most of the
+downloaded content. You can force partial scraping of downloaded pages with
+~--force~ (i.e. if you want to collect just 250 entries per list, specify ~-c
+250 -f~; it will still download 300, because that's how the pages are built, but
+will only scrape the first 250).
+
 ** Dependencies
 
-  - Python 3
-  - [[http://docs.python-requests.org/][Python Requests]]. The ~requests~ Python module is used to download the pages.
-  - [[https://www.crummy.com/software/BeautifulSoup/bs4/doc/][Beatuful Soup]]. Python ~BeautifulSoup~ is used to parse the pages.
+The scraper has the following dependencies:
 
-* Notes
+  - Python 3
+  - The [[http://docs.python-requests.org/][Python Requests]] module is used to download the pages.
+  - The [[https://www.crummy.com/software/BeautifulSoup/bs4/doc/][Beatuful Soup]] Python module is used to parse the pages.
+
+** Proxy support
+
+The ~requests~ module has built-in [[http://docs.python-requests.org/en/master/user/advanced/#proxies][proxy support]]. If needed, you can set the
+~HTTPS_PROXY~ environment variable pointing to your proxy before running the
+scraper:
+
+#+BEGIN_EXAMPLE
+HTTPS_PROXY="http://my-proxy.example.com:3128"
+#+END_EXAMPLE
+
+* Scraping notes
 
 Some notes about the website structure, to keep in mind during scraping.
 
 ** List page
 
 *** Number format
+
 Numbers are written in US format, with commas to separate thousands and dots for
 the decimal point.
 
@@ -66,15 +136,26 @@ site and the 3rd contains the system.
 We scrape only the full lists, as the highlights/summary do not provide any
 additional information.
 
-*** List structure: sites and systems
+*** System name column structure
 
-A system (3rd column in the list) looks like this in most cases:
+In general, a /system/ (3rd column in the list) looks like this in most cases:
 
 #+BEGIN_EXAMPLE
   <td><a href="https://www.top500.org/system/SYSTEM_ID">
       SYSTEM_NAME, PROCESSOR, INTERCONNECT, COPROCESSORS
   </a><br/>MANUFACTURER</td>
 #+END_EXAMPLE
+
+Of these fields, /System Name/ and /Co-processors/ can only be found here
+(i.e. in that colum of the listings) - they are not provided in the system's
+details page. Well, the title of that page copies the whole lot, including
+system name and processors, but the name or co-processors are not listed by
+themselves anywhere.
+
+/Interconnect/ and /Processor/ are listed in the system's details page (the
+/href/ in that column) and can be properly identified from that other page.
+Therefore, an attempt has been made to extract a system's /name/ and
+/co-processor/ (stored as /gpu/ in the output) from this column.
 
 However:
 
@@ -91,12 +172,65 @@ However:
    Phi 7120P]]. We bundle all of them together in the /gpu/ field.
 
  - some systems include GPU information at the beginning of their name,
-   e.g. [[https://www.top500.org/system/177996][SANAM - Adtech, ASUS ESC4000/FDR G2, Xeon E5-2650 8C 2.000GHz, Infiniband
-   FDR, AMD FirePro S10000]].
+   e.g. [[https://www.top500.org/system/177996][SANAM - Adtech, ASUS ESC4000/FDR G2, Xeon E5-2650 8C 2.000GHz, Infiniband FDR, AMD FirePro S10000]].
 
  - some systems have the order of the fields reversed, like [[https://www.top500.org/system/179200][Inspur SA5212H5,
    Xeon E5-2682v4 16C 2.5GHz, NVIDIA Tesla P100, 25G Ethernet]] which lists the
    interconnect after the GPU.
+
+ - some systems mention the co-processor but not the interconnect,
+   e.g. [[https://www.top500.org/system/176929][Tianhe-1A - NUDT YH MPP, Xeon X5670 6C 2.93 GHz, NVIDIA 2050]]
+
+ - some systems simply have no specific name, they are just a concatenation of
+   e.g. processor + interconnect, like [[https://www.top500.org/system/173259][Pentium4 Xeon 2.4 GHz, Myrinet]]
+
+As a result of all this, parsing of the system entry from the listing to obtain
+the /name/ and /gpu/ is actually impossible to do reliably for all the systems
+just from the data available in the top500 web site.
+
+Therefore, the code that handles this is "best effort" and the /GPU/ column of
+the output has "mixed results". Some additional processing with the help of
+specialized data sources (e.g. a database of known co-processors) would improve
+that.
+
+ Lacking this, the approach taken was:
+
+  - Remove the known /processor/ and /interconnect/ details from the system's
+    description. NOTE: these are not exact matches, and there's quite variety
+    here too unfortunately.
+
+  - With the remaining content (if any), try to guess what's the name and what's
+    the GPU. After some observations, it seems that the simplest approach to
+    take here is to use the first remaining part (delimited by commas) as the
+    name and the rest as GPU.
+
+**** Fuzzy comparison notes
+
+~SequenceMatcher~ from ~difflib~ has been used to compare known details with
+system descriptions to try to extract the information. It's challenging.
+
+These are supposed to be *equal* (interconnect):
+
+#+BEGIN_EXAMPLE
+>>> from difflib import SequenceMatcher as SM
+>>> SM(None, 'Custom', 'Custom Interconnect').ratio()
+0.48
+>>> SM(None, 'Gigabit Ethernet', 'GigEth').ratio()
+0.5454545454545454
+#+END_EXAMPLE
+
+These should be *different* (system name vs processor):
+
+#+BEGIN_EXAMPLE
+>>> SM(None, 'R12000 300MHz', 'ORIGIN 2000 300 MHz').ratio()
+0.75
+>>> SM(None, 'PowerPC 604e 332MHz', 'SP PC604e 332 MHz').ratio()
+0.7777777777777778
+>>> SM(None, 'Cray X1E (1 GHz)', 'Cray X1E 2c 1GHz').ratio()
+0.8125
+#+END_EXAMPLE
+
+*** Site name column structure
 
 A site (2nd column in the list) looks like this:
 
@@ -107,6 +241,7 @@ A site (2nd column in the list) looks like this:
 ** System details page
 
 *** Power
+
 Several /Power/ values are marked as "(Submitted)", e.g. https://www.top500.org/system/177981.
 
 Some have "(Derived)": https://www.top500.org/system/178751
@@ -115,10 +250,101 @@ Many have no value in this field.
 
 *** Some systems evolve over time
 
-Several fields can change, including the system's name, number of cores, Rmax, Rpeak, Power, ...
+Several fields can change on the same system between different editions of the
+list, including the system's name, number of cores, Rmax, Rpeak, Power, ...
 
 Examples:
  - https://www.top500.org/system/178192
  - https://www.top500.org/system/177459
  - https://www.top500.org/system/177449
 
+The wesite is a bit inconsistent here: the system details page always lists the
+latest version of the content, regardless of its history.
+
+The scraper keeps the same values that the lists show, overriding system details
+with the values from the lists on each edition, to avoid the inconsistency as
+much as possible.
+
+* Collected dataset
+
+The attached dataset is the full collection of TOP500 lists, i.e. starting
+from the first available list from June 1993. It was collected like this:
+
+#+BEGIN_EXAMPLE
+$ time python3 -u scrape.py --year 1993 --month 6 > scraping.log
+
+real	45m39,544s
+user	9m23,815s
+sys	0m2,897s
+#+END_EXAMPLE
+
+While exploring the collected dataset, a bug was detected in a specific system
+and also in the code (that didn't properly detect and handle the unexpextec
+value). The problem is in [[https://www.top500.org/system/178385][Faris - Cluster Platform SL230s Gen8, Intel Xeon
+E5-2680v2 10C 2.8GHz, Infiniband QDR]], that at the time of this data collection
+was listing /-1 GB/ of memory. The code didn't expect negative memory values
+and just let it through "as is", resulting in an invalid value in the dataset.
+To avoid a full re-collection of the dataset, the 8 entries for that system were
+manually fixed in the dataset, leaving its memory information empty.
+
+While adding the dataset in the repo, another problem was detected:
+
+#+BEGIN_EXAMPLE
+fatal: LF reemplaçaria CRLF en data/top500.csv.
+#+END_EXAMPLE
+
+it turns out that the way ~argparse~ opens the output file is not quite what
+~csv.write~ handles best, and the resulting output file used CRLF for line ends.
+This was also manually collected in the file.
+
+A quick overview of the resulting dataset structure as loaded from R:
+
+#+BEGIN_SRC R :results output :exports both
+  col.classes <- c(
+      'year'        = 'factor',
+      'month'       = 'factor',
+      'site_id'     = 'factor',
+      'system_id'   = 'factor',
+      'name'        = 'character',
+      'site_name'   = 'character',
+      'system_url'  = 'character'
+  )
+  top500 <- read.csv('data/top500.csv',
+                     na.strings = '',
+                     colClasses = col.classes)
+  str(top500)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+'data.frame':	25000 obs. of  25 variables:
+ $ site_name   : chr  "Los Alamos National Laboratory" "Minnesota Supercomputer Center" "National Security Agency" "NCSA" ...
+ $ system_url  : chr  "http://www.acl.lanl.gov/" NA NA NA ...
+ $ manufacturer: Factor w/ 124 levels "Acer Group","ACTION",..: 118 118 118 118 81 81 118 59 20 20 ...
+ $ cores       : int  1024 544 512 512 4 4 256 512 16 16 ...
+ $ memory      : int  NA NA NA NA NA NA NA NA NA NA ...
+ $ processor   : Factor w/ 463 levels "Alpha  1.25GHz",..: 312 312 312 312 130 129 312 74 26 26 ...
+ $ interconnect: Factor w/ 71 levels "100G Ethernet",..: 28 28 28 28 50 50 28 NA NA NA ...
+ $ rmax        : num  59.7 30.4 30.4 30.4 23.2 20 15.1 13.9 13.7 13.7 ...
+ $ rpeak       : num  131 69.6 65.5 65.5 25.6 22 32.8 20.5 15.2 15.2 ...
+ $ nmax        : int  52224 36864 36864 36864 6400 6144 26112 25000 10000 10000 ...
+ $ nhalf       : int  24064 16384 16384 16384 830 832 12032 7500 650 650 ...
+ $ hpcg        : num  NA NA NA NA NA NA NA NA NA NA ...
+ $ power       : num  NA NA NA NA NA NA NA NA NA NA ...
+ $ os          : Factor w/ 72 levels "AIX","Bullx Linux",..: 7 7 7 7 50 50 7 26 62 62 ...
+ $ compiler    : Factor w/ 100 levels "CCE","cce 8.0",..: NA NA NA NA NA NA NA NA NA NA ...
+ $ math        : Factor w/ 70 levels "-","2017.0.2",..: NA NA NA NA NA NA NA NA NA NA ...
+ $ mpi         : Factor w/ 103 levels "bullx MPI","bullxmpi 1.1.11.1",..: NA NA NA NA NA NA NA NA NA NA ...
+ $ gpu         : Factor w/ 508 levels "1 GHz","1.25 GHz",..: NA NA NA NA NA NA NA NA NA NA ...
+ $ country     : Factor w/ 59 levels "Australia","Austria",..: 57 57 57 57 26 7 57 57 57 57 ...
+ $ site_id     : Factor w/ 2853 levels "47223","47224",..: 809 881 980 925 927 107 989 233 324 338 ...
+ $ system_id   : Factor w/ 10421 levels "166659","166660",..: 188 248 247 246 3217 3216 214 317 4740 4742 ...
+ $ name        : chr  "CM-5/1024" "CM-5/544" "CM-5/512" "CM-5/512" ...
+ $ year        : Factor w/ 25 levels "1993","1994",..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ month       : Factor w/ 2 levels "11","6": 2 2 2 2 2 2 2 2 2 2 ...
+ $ rank        : int  1 2 3 4 5 6 7 8 9 10 ...
+#+end_example
+
+There are 50 lists, at 500 entries each, totaling the 25.000 observations. We
+can see it covers data for 10.421 systems (different system_id) from 2.853 sites
+(site_id) located in 59 countries.
