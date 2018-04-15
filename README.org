@@ -267,15 +267,15 @@ much as possible.
 
 * Collected dataset
 
-The attached dataset is the full collection of TOP500 lists, i.e. starting
-from the first available list from June 1993. It was collected like this:
+The [[data/top500.csv][attached dataset]] is the full collection of TOP500 lists, i.e. starting
+from the first available list from June 1993. It was collected with:
 
 #+BEGIN_EXAMPLE
 $ time python3 -u scrape.py --year 1993 --month 6 > scraping.log
 
-real	45m39,544s
-user	9m23,815s
-sys	0m2,897s
+real	57m7,175s
+user	11m38,674s
+sys	0m4,049s
 #+END_EXAMPLE
 
 While adding the dataset in the repo, [[https://github.com/codificat/top500/issues/2][a problem]] was detected:
