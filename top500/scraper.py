@@ -313,11 +313,11 @@ class Scraper:
                 # we check we have so many cols.
                 continue
             entry = dict.fromkeys(ENTRY_FIELDS)
+            self.__parse_system_column(entry, cols[2])
+            _parse_site_column(entry, cols[1])
             entry['rank'] = int(cols[0].get_text())
             entry['year'] = edition.year
             entry['month'] = edition.month
-            _parse_site_column(entry, cols[1])
-            self.__parse_system_column(entry, cols[2])
             entry['cores'] = locale.atoi(cols[3].get_text())
             entry['rmax'] = locale.atof(cols[4].get_text())
             entry['rpeak'] = locale.atof(cols[5].get_text())
