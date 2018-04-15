@@ -1,5 +1,6 @@
 *~
 *swp*
+.Rhistory
 *.pyc
 *.pyo
 *.log
