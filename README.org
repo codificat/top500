@@ -279,15 +279,16 @@ sys	0m2,897s
 #+END_EXAMPLE
 
 While exploring the collected dataset, a bug was detected in a specific system
-and also in the code (that didn't properly detect and handle the unexpextec
-value). The problem is in [[https://www.top500.org/system/178385][Faris - Cluster Platform SL230s Gen8, Intel Xeon
-E5-2680v2 10C 2.8GHz, Infiniband QDR]], that at the time of this data collection
-was listing /-1 GB/ of memory. The code didn't expect negative memory values
-and just let it through "as is", resulting in an invalid value in the dataset.
-To avoid a full re-collection of the dataset, the 8 entries for that system were
-manually fixed in the dataset, leaving its memory information empty.
+and also [[https://github.com/codificat/top500/issues/1][in the code]] (that didn't properly detect and handle the unexpexted
+value). The problem is in [[https://www.top500.org/system/178385][Faris -
+Cluster Platform SL230s Gen8, Intel Xeon E5-2680v2 10C 2.8GHz, Infiniband QDR]],
+that at the time of this data collection was listing /-1 GB/ of memory. The code
+didn't expect negative memory values and just let it through "as is", resulting
+in an invalid value in the dataset.  To avoid a full re-collection of the
+dataset, the 8 entries for that system were manually fixed in the dataset,
+leaving its memory information empty.
 
-While adding the dataset in the repo, another problem was detected:
+While adding the dataset in the repo, [[https://github.com/codificat/top500/issues/2][another problem]] was detected:
 
 #+BEGIN_EXAMPLE
 fatal: LF reemplaçaria CRLF en data/top500.csv.
