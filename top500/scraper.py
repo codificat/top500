@@ -98,6 +98,12 @@ def _numeric_value(var, val):
        - remove any text on it (e.g. units, thousands separators)
        - use correct type
     '''
+    # Negative values are incorrect: there's no numeric variable in the
+    # dataset where negative numbers make sense. If the value starts
+    # with a minus we replace it with an empty value
+    if re.match(r'-', val):
+        return None
+
     match = re.match(r'([\d,.]+)', val)
     if not match:
         # The provided value doesn't start with a number
