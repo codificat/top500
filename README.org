@@ -3,14 +3,14 @@
 #+AUTHOR: Pep Turró Mauri
 #+LANGUAGE: en
 
-* TOP500 list web scraping
-
 This is a project to do web scraping of the [[https://www.top500.org/][TOP500 list]], which is a list of the
 500 most powerful commercially available computers in the world.
 
 The goal of this project is to extract the details of the computers from the
 lists presented in the web site as HTML tables and store them in CSV format for
 later processing.
+
+* Overview
 
 ** The www.top500.org web site structure
 
