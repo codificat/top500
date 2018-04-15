@@ -5,7 +5,7 @@ import re
 from difflib import SequenceMatcher
 import requests
 from bs4 import BeautifulSoup
-from top500.urlgen import id_from_link, list_edition, url_for_system
+from top500.urlgen import id_from_link, list_edition, url_for_system, url_for_site
 
 # The list of fields we know about for a system.
 # This is a dictionary where the keys are the name of the fields
@@ -36,6 +36,10 @@ SYSTEM_FIELDS = {
     'site_id': 'site_id',     # site_id is taken from its URL
     'system_id': 'system_id', # the system_id is taken from its URL
     'name': 'name',           # the name is a sub-field in the listing
+    # Site information that comes from the site details page
+    'site_url': 'site_url',
+    'city': 'city',
+    'segment': 'segment',
 }
 
 # The complete list of fields that we store for each list entry.
@@ -56,6 +60,11 @@ SITE_ROWS = {
     'Country': 'country',
     'Segment': 'segment'
 }
+
+# The list of fields we know about for a site includes details that don't
+# come from the details table: name comes from the header, ID comes from
+# the URL
+SITE_FIELDS = list(SITE_ROWS.values()) + ['site_id', 'site_name']
 
 # Fields that store numeric values. These will be cleaned up (some entries
 # include units) and their type will be updated
@@ -83,26 +92,6 @@ def _fetch(url, session):
     if page.status_code != 200:
         raise DownloadError("Something went wrong: %d" % page.status_code)
     return page
-
-def _parse_site_column(system, col):
-    '''Parses a column value corresponding to a site in one of the
-    list pages. Such a column looks like this:
-
-      <td><a href="https://www.top500.org/site/SITE_ID">
-          SITE_NAME</a><br>COUNTRY</td>
-
-    Params:
-     - system: the dict object for the system, where site details
-       will be added
-     - col: a BeautifulSoup Tag object corresponding to the TD
-       element with the data to parse.
-    '''
-    link = col.a
-    system['site_id'] = id_from_link(link['href'])
-    system['site_name'] = link.get_text(strip=True)
-    # Remove system details, so we're left only with the country
-    link.decompose()
-    system['country'] = col.get_text(strip=True)
 
 def _numeric_value(var, val):
     '''Clean up a value for a numeric variable:
@@ -169,7 +158,7 @@ class Scraper:
         if self.entry_callback:
             self.entry_callback(entry)
 
-    def _scrape_system_page(self, system_id):
+    def __scrape_system_page(self, system_id):
         '''Downloads and scrapes a system's details page.
         Sample row from a details page:
 
@@ -206,6 +195,54 @@ class Scraper:
 
         return system
 
+    def __scrape_site_page(self, site_id):
+        '''Downloads and scrapes a site's details page.
+        Returns a dictionary of site properties with SITE_FIELDS as keys.
+        '''
+
+        site = dict.fromkeys(SITE_FIELDS)
+        site['site_id'] = site_id
+        page = _fetch(url_for_site(site_id), self.session)
+        soup = BeautifulSoup(page.text, 'html.parser')
+
+        # The name of the site is in the first non-empt H1 element
+        # of a site details page
+        for header in soup.find_all('h1'):
+            site['site_name'] = header.get_text(strip=True)
+            if site['site_name']:
+                break
+
+        # There are 3 tables in a Site details page:
+        # - the details of the site itself
+        # - a list of systems from the site
+        # - a history of number of systems and ranks
+        # We are only interested in the first list, the others can be
+        # computed from the rest of the data
+        for row in soup.table.find_all('tr'):
+            try:
+                fieldname = row.th.get_text(strip=True)
+                variable = SITE_ROWS[fieldname]
+                value = row.td.get_text(strip=True)
+            except KeyError:
+                print("Igoring unkown site detail '%s' in site %s" %
+                      (fieldname, site_id))
+                continue
+            site[variable] = value
+
+        return site
+
+    def __get_site_details(self, site_id):
+        '''Find details about a site. Check the site cache first, scrape
+        if not found.
+        '''
+        try:
+            site = self.sites[site_id]
+        except KeyError:
+            site = self.__scrape_site_page(site_id)
+            # Add it to the cache
+            self.sites[site_id] = site
+        return site
+
     def __get_system_details(self, system_id):
         '''Find details about a system. Check if we scraped its details before,
         and if not, scrape them.
@@ -216,7 +253,7 @@ class Scraper:
         try:
             system = self.systems[system_id]
         except KeyError:
-            system = self._scrape_system_page(system_id)
+            system = self.__scrape_system_page(system_id)
         return system
 
     def __parse_system_details(self, system, link):
@@ -286,6 +323,25 @@ class Scraper:
         link.decompose()
         system['manufacturer'] = col.get_text(strip=True)
 
+    def __parse_site_column(self, system, col):
+        '''Parses a column value corresponding to a site in one of the
+        list pages. Such a column looks like this:
+
+          <td><a href="/site/SITE_ID">SITE_NAME</a><br>COUNTRY</td>
+
+        We are only interested in the SITE_ID; the rest of a site's
+        details are scraped from the site's details page (and cached).
+
+        Params:
+         - system: the dict object for the system, where site details
+           will be added
+         - col: a BeautifulSoup Tag object corresponding to the TD
+           element with the data to parse.
+        '''
+        link = col.a
+        site = self.__get_site_details(id_from_link(link['href']))
+        system.update(site)
+
     def set_entry_callback(self, callback):
         'Sets the callback function to be called when a list entry is added'
         self.entry_callback = callback
@@ -322,7 +378,7 @@ class Scraper:
                 continue
             entry = dict.fromkeys(ENTRY_FIELDS)
             self.__parse_system_column(entry, cols[2])
-            _parse_site_column(entry, cols[1])
+            self.__parse_site_column(entry, cols[1])
             entry['rank'] = int(cols[0].get_text())
             entry['year'] = edition.year
             entry['month'] = edition.month
