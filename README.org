@@ -287,3 +287,10 @@ fatal: LF reemplaçaria CRLF en data/top500.csv.
 it turns out that the way ~argparse~ opens the output file is not quite what
 ~csv.write~ handles best, and the resulting output file used CRLF for line ends.
 This was manually corrected in the file.
+
+* License
+
+The web scraping code provided here is released under the GPL v3 license (see
+[[LICENSE]]).
+
+The attached dataset is provided under the [[https://creativecommons.org/publicdomain/zero/1.0/][CC0 1.0 Public Domain]].

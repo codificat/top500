@@ -8,3 +8,4 @@
 *.csv
 !data/*.csv
 venv/
+_minted*
