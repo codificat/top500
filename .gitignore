@@ -9,3 +9,6 @@
 !data/*.csv
 venv/
 _minted*
+ltximg/
+*.bbl
+*.tex
