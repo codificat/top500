@@ -52,7 +52,7 @@ diferent en un nou registre.
 
 El [[#dataset][dataset adjunt al repositori]] inclou les dades completes de les 50 edicions de
 la llista TOP500 publicades fins ara, és a dir, 50 × 500 = 25.000 registres. El
-[[#code][codi de l'sraper]] permet triar quines llistes i quants registres volem. La
+[[#code][codi de l'scraper]] permet triar quines llistes i quants registres volem. La
 captura del dataset adjunt es va fer especificant la data de la primera llista
 (Juny de 1993) com a punt de partida (per defecte, el programa captura des del
 punt de partida fins a la darrera publicada, que es calcula en temps d'execució
